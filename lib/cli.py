@@ -1,21 +1,23 @@
 import sys
 import os
+from datetime import datetime
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 # Add the project root to sys.path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/../')
 
-from db.models import Customer, Reservation, Table
-
-import click
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from db.models import Customer, Reservation, Table
-from datetime import datetime
+# Import models locally to avoid circular import issues
+def get_models():
+    from db.models import Customer, Reservation, Table
+    return Customer, Reservation, Table
 
 # Database setup
 engine = create_engine('sqlite:///restaurant_reservation.db')
 Session = sessionmaker(bind=engine)
 session = Session()
+
+Customer, Reservation, Table = get_models()
 
 # Menu display
 def display_menu():
@@ -64,14 +66,28 @@ def delete_customer():
         print(f"Customer with ID {customer_id} not found.")
 
 def create_reservation():
-    customer_id = input("Enter customer ID: ")
-    table_id = input("Enter table ID: ")
-    date_str = input("Enter reservation date (YYYY-MM-DD): ")
-    reservation_date = datetime.strptime(date_str, '%Y-%m-%d')
-    reservation = Reservation(customer_id=customer_id, table_id=table_id, date=reservation_date)
-    session.add(reservation)
-    session.commit()
-    print("Reservation created successfully.")
+    try:
+        customer_id = input("Enter customer ID: ")
+        table_id = input("Enter table ID: ")
+        date_str = input("Enter reservation date (YYYY-MM-DD): ")
+        reservation_date = datetime.strptime(date_str, '%Y-%m-%d')
+
+        customer = session.query(Customer).filter_by(id=customer_id).first()
+        if not customer:
+            print(f"Customer with ID {customer_id} not found.")
+            return
+
+        table = session.query(Table).filter_by(id=table_id).first()
+        if not table:
+            print(f"Table with ID {table_id} not found.")
+            return
+
+        reservation = Reservation(customer_id=customer_id, table_id=table_id, date=reservation_date)
+        session.add(reservation)
+        session.commit()
+        print("Reservation created successfully.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
 
 def view_reservations():
     reservations = session.query(Reservation).all()
